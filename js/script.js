@@ -20,6 +20,7 @@ const languages = {
   it: 'it-IT',
   chi: 'zh-CN',
 }
+
 async function fetchData(url, opt) {
   try {
     const response = await fetch(url, opt)
@@ -27,6 +28,7 @@ async function fetchData(url, opt) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
     const data = await response.json()
+    // console.log(data.results)
 
     renderMovies(data.results)
   } catch (error) {
@@ -35,8 +37,11 @@ async function fetchData(url, opt) {
 }
 
 function getLanguage(e) {
-  const lang = e.target.getAttribute('data-lg')
+  let lang =
+    e?.target?.getAttribute('data-lg') || localStorage.getItem('lang') || 'en'
+  localStorage.setItem('lang', lang)
   const languageCode = languages[lang]
+
   const languagesLink = document.querySelectorAll('#languages .nav-link img')
 
   languagesLink.forEach((link) => {
@@ -47,13 +52,15 @@ function getLanguage(e) {
     }
   })
 
-  if (languageCode) {
-    urlLink = `https://api.themoviedb.org/3/movie/popular?api_key=${key}&language=${languageCode}&page=1`
+  const popularMovies = document.querySelector('#popular-movies')
 
-    const popularMovies = document.querySelector('#popular-movies')
+  if (popularMovies) {
     popularMovies.innerHTML = ''
   }
-  fetchData(urlLink)
+  if (languageCode) {
+    urlLink = `https://api.themoviedb.org/3/movie/popular?api_key=${key}&language=${languageCode}&page=1`
+    fetchData(urlLink)
+  }
 }
 
 // Render movies
@@ -88,61 +95,102 @@ function renderMovies(movies) {
 
 function renderMovieDetails(movie) {
   const movieDetails = document.querySelector('#movie-details')
-  const { poster_path, title, overview, release_date, vote_average, id } = movie
+  const {
+    poster_path,
+    title,
+    overview,
+    release_date,
+    vote_average,
+    homepage,
+    budget,
+    revenue,
+    runtime,
+    status,
+    genres,
+    production_companies,
+  } = movie
   const fullPosterUrl = `${baseImageUrl}${poster_path}` // Construct full image URL;
+  function loopGenres(genres) {
+    let genreList = ''
+    genres.forEach((genre) => {
+      genreList += `<li>${genre.name}</li>`
+    })
+    return genreList
+  }
+  function productionCompanies(Companies) {
+    let companyList = ''
+    Companies.forEach((company) => {
+      companyList += `  <div class="list-group">${company.name} </div>`
+    })
+    return companyList
+  }
+  function voteRating(vote_average) {
+    const rating = Math.round(vote_average)
+    const calcAverage = (rating / 10) * 5
+
+    const fullStar = Math.round(calcAverage)
+    let ratingHTML = ''
+    for (let i = 0; i < 5; i++) {
+      if (i < fullStar) {
+        ratingHTML += `<i class="fas fa-star text-primary"></i>
+        `
+      } else {
+        ratingHTML += `<i class="far fa-star text-primary"></i>`
+      }
+    }
+    return ratingHTML
+  }
 
   movieDetails.innerHTML = `
    <div class="details-top">
           <div>
             <img
-              src="images/no-image.jpg"
+              src="${fullPosterUrl}"
               class="card-img-top"
-              alt="Movie Title"
+              alt="${title}"
             />
           </div>
           <div>
-            <h2>Movie Title</h2>
+            <h2>${title}</h2>
             <p>
-              <i class="fas fa-star text-primary"></i>
-              8 / 10
+             ${voteRating(vote_average)} 
             </p>
-            <p class="text-muted">Release Date: XX/XX/XXXX</p>
+            <p class="text-muted">Release Date: ${release_date}</p>
             <p>
-              Lorem ipsum dolor sit amet consectetur adipisicing elit. Maiores
-              atque molestiae error debitis provident dolore hic odit, impedit
-              sint, voluptatum consectetur assumenda expedita perferendis
-              obcaecati veritatis voluptatibus. Voluptatum repellat suscipit,
-              quae molestiae cupiditate modi libero dolorem commodi obcaecati!
-              Ratione quia corporis recusandae delectus perspiciatis consequatur
-              ipsam. Cumque omnis ad recusandae.
+              ${overview}
             </p>
             <h5>Genres</h5>
             <ul class="list-group">
-              <li>Genre 1</li>
-              <li>Genre 2</li>
-              <li>Genre 3</li>
+              ${loopGenres(genres)}
             </ul>
-            <a href="#" target="_blank" class="btn">Visit Movie Homepage</a>
+            <a href="${homepage}" target="_blank" class="btn">Visit Movie Homepage</a>
           </div>
         </div>
         <div class="details-bottom">
           <h2>Movie Info</h2>
           <ul>
-            <li><span class="text-secondary">Budget:</span> $1,000,000</li>
-            <li><span class="text-secondary">Revenue:</span> $2,000,000</li>
-            <li><span class="text-secondary">Runtime:</span> 90 minutes</li>
-            <li><span class="text-secondary">Status:</span> Released</li>
+            <li><span class="text-secondary">Budget:</span> $ ${budget}</li>
+            <li><span class="text-secondary">Revenue:</span> $ ${revenue}</li>
+            <li><span class="text-secondary">Runtime:</span> ${runtime} minutes</li>
+            <li><span class="text-secondary">Status:</span> ${status}</li>
           </ul>
           <h4>Production Companies</h4>
-          <div class="list-group">Company 1, Company 2, Company 3</div>
+          ${productionCompanies(production_companies)}
+        
         </div>
   
   `
-  console.log(movie)
 }
 
-function detailMovie(id) {
-  const url = `https://api.themoviedb.org/3/movie/${id}?api_key=${key}`
+function detailMovie() {
+  const queryString = window.location.search
+  const id = queryString.split('=')[1]
+  const lang = localStorage.getItem('lang')
+
+  const languageCode = languages[lang]
+
+  const url = `https://api.themoviedb.org/3/movie/${id}?language=${languageCode}&api_key=${key}`
+
   async function fetchData(url, opt) {
     try {
       const response = await fetch(url, opt)
@@ -150,7 +198,6 @@ function detailMovie(id) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       const data = await response.json()
-
       renderMovieDetails(data)
     } catch (error) {
       console.log(error)
@@ -174,17 +221,17 @@ function highlightActiveLink(linkName) {
 
 // Initialize the app
 function init() {
-  console.log(window.location.search)
-  const queryString = window.location.search
-  const id = queryString.split('=')[1]
-  console.log(id)
-  detailMovie(id)
   const pathName = window.location.pathname
   switch (pathName) {
     case '/':
     case '/index.html':
     case '/movie-details.html':
       highlightActiveLink('Movies')
+      if (pathName === '/' || pathName === '/index.html') {
+        getLanguage()
+      } else if (pathName === '/movie-details.html') {
+        detailMovie()
+      }
       break
     case '/shows.html':
     case '/tv-details.html':
@@ -198,9 +245,8 @@ function init() {
 }
 
 // Start when DOM is fully loaded
-document.addEventListener('DOMContentLoaded', (e) => {
+document.addEventListener('DOMContentLoaded', () => {
   init()
-  fetchData(urlLink, options)
 })
 document.addEventListener('click', (e) => {
   if (e.target.matches('[data-lg]')) {
