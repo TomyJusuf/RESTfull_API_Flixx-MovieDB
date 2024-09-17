@@ -10,6 +10,8 @@ const options = {
     Authorization: `Bearer ${tokey}`,
   },
 }
+const API_URL = 'https://api.themoviedb.org/3/'
+
 const languages = {
   en: 'en-GB',
   cs: 'cs-CS',
@@ -22,13 +24,21 @@ const languages = {
 const baseImageUrl = 'https://image.tmdb.org/t/p/w500' // base URL for images
 async function fetchData(url, opt) {
   try {
+    showSpinner()
     const response = await fetch(url, opt)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
     const data = await response.json()
-
+    hideSpinner()
+    function showSpinner() {
+      document.querySelector('.spinner').classList.add('show')
+    }
+    function hideSpinner() {
+      document.querySelector('.spinner').classList.remove('show')
+    }
     renderMovies(data.results)
+    return data
   } catch (error) {
     console.log(error)
   }
@@ -39,8 +49,8 @@ function getLanguage(e) {
     e?.target?.getAttribute('data-lg') || localStorage.getItem('lang') || 'en'
   localStorage.setItem('lang', lang)
   const languageCode = languages[lang]
-
   const languagesLink = document.querySelectorAll('#languages .nav-link img')
+  const entpoint = 'movie/popular'
 
   languagesLink.forEach((link) => {
     if (link.getAttribute('data-lg') === lang) {
@@ -56,14 +66,69 @@ function getLanguage(e) {
     popularMovies.innerHTML = ''
   }
   if (languageCode) {
-    urlLink = `https://api.themoviedb.org/3/movie/popular?language=${languageCode}&page=1`
+    urlLink = `${API_URL}${entpoint}?language=${languageCode}&page=1`
     fetchData(urlLink, options)
   }
+}
+async function displaySLider() {
+  const entpoint = 'movie/now_playing'
+  const url = `${API_URL}${entpoint}`
+
+  const { results } = await fetchData(url, options)
+  results.forEach((movie) => {
+    const { poster_path, title, id } = movie
+
+    const fullPosterUrl = `${baseImageUrl}${poster_path}` // Construct full image URL
+
+    const div = document.createElement('div')
+    div.classList.add('swiper-slide')
+
+    div.innerHTML = `
+        <a href="movie-details.html?id=${id}">
+          <img src="${fullPosterUrl}" alt="${title}" />
+        </a>
+        <h4 class="swiper-rating">
+          <i class="fas fa-star text-secondary"></i> ${Math.round(
+            movie.vote_average
+          )} / 10
+        </h4>
+  `
+
+    document.querySelector('.swiper-wrapper').appendChild(div)
+
+    initSwiper()
+  })
+}
+
+function initSwiper() {
+  //swiper library
+  const swiper = new Swiper('.swiper', {
+    // eslint-disable-line
+    slidesPerView: 1,
+    spaceBetween: 30,
+    freeMode: true,
+    loop: true,
+    autoplay: {
+      delay: 4000,
+      disableOnInteraction: false,
+    },
+    breakpoints: {
+      500: {
+        slidesPerView: 2,
+      },
+      768: {
+        slidesPerView: 3,
+      },
+      1200: {
+        slidesPerView: 4,
+      },
+    },
+  })
 }
 
 // Render movies
 
-function renderMovies(movies) {
+async function renderMovies(movies) {
   movies.forEach((movie) => {
     const { poster_path, title, release_date, id } = movie
     const fullPosterUrl = `${baseImageUrl}${poster_path}` // Construct full image URL
@@ -175,9 +240,9 @@ async function detailMovie() {
   const fallbackLanguage = 'en-Us'
 
   async function fetchData(lang) {
-    const url = `https://api.themoviedb.org/3/movie/${id}?language=${
-      lang ? lang : languageCode
-    }`
+    const entpoint = `movie/${id}`
+    const url = `${API_URL}${entpoint}?language=${lang ? lang : languageCode}`
+
     try {
       const response = await fetch(url, options)
       if (!response.ok) {
@@ -216,7 +281,9 @@ function getTvShows() {
   const lang = localStorage.getItem('lang')
 
   const languageCode = languages[lang]
-  const url = `https://api.themoviedb.org/3/tv/popular?language=${languageCode}`
+  const entpoint = 'tv/popular'
+  const url = `${API_URL}${entpoint}?language=${languageCode}`
+
   async function fetchData() {
     try {
       const response = await fetch(url, options)
@@ -263,10 +330,9 @@ async function getDetailsTVShow() {
   const languageCode = languages[lang]
   const fallbackLanguage = 'en-US'
 
+  const entpoint = `tv/${idTvShow}`
   async function fetchData(lang) {
-    const url = `https://api.themoviedb.org/3/tv/${idTvShow}?language=${
-      lang ? lang : languageCode
-    }`
+    const url = `${API_URL}${entpoint}?language=${lang ? lang : languageCode}`
     try {
       const response = await fetch(url, options)
       if (!response.ok) {
@@ -364,6 +430,7 @@ function init() {
   switch (pathName) {
     case '/':
     case '/index.html':
+      displaySLider()
     case '/movie-details.html':
       highlightActiveLink('Movies')
       if (pathName === '/' || pathName === '/index.html') {
